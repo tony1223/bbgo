@@ -48,6 +48,9 @@ func (m *Notifiability) AddNotifier(notifier Notifier) {
 }
 
 func (m *Notifiability) Notify(obj interface{}, args ...interface{}) {
+	if m == nil {
+		return
+	}
 	for _, n := range m.notifiers {
 		n.Notify(obj, args...)
 	}

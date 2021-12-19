@@ -158,7 +158,7 @@ func (m BacktestAccountBalanceMap) BalanceMap() types.BalanceMap {
 		balances[currency] = types.Balance{
 			Currency:  currency,
 			Available: value,
-			Locked:    0,
+			Locked:    fixedpoint.NewFromInt(0),
 		}
 	}
 	return balances
