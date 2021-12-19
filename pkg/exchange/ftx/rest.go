@@ -222,6 +222,7 @@ func (r *restRequest) sendRequest(req *http.Request) (*util.Response, error) {
 
 	// newResponse reads the response body and return a new Response object
 	response, err := util.NewResponse(resp)
+	
 	if err != nil {
 		return response, err
 	}
