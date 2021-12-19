@@ -4,6 +4,7 @@ package cmd
 import (
 	_ "github.com/c9s/bbgo/pkg/strategy/bollgrid"
 	_ "github.com/c9s/bbgo/pkg/strategy/bollpp"
+	_ "github.com/c9s/bbgo/pkg/strategy/cpgrid"
 	_ "github.com/c9s/bbgo/pkg/strategy/emastop"
 	_ "github.com/c9s/bbgo/pkg/strategy/etf"
 	_ "github.com/c9s/bbgo/pkg/strategy/flashcrash"
