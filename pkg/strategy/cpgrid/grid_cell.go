@@ -64,7 +64,7 @@ func (c *GridCell) generateOrders() []ICellOrder {
 
 func (c *GridCell) _generateInitOrders(currentPrice fixedpoint.Value) []ICellOrder {
 	var orders []ICellOrder
-	if currentPrice < c.SellPrice {
+	if currentPrice < c.BuyPrice {
 		//sell
 		orders = append(orders, &CellOrder{
 			Order: types.SubmitOrder{
@@ -83,13 +83,14 @@ func (c *GridCell) _generateInitOrders(currentPrice fixedpoint.Value) []ICellOrd
 			Cost: map[string]types.Asset{
 				c.Strategy.BaseCurrency: types.Asset{
 					Currency: c.Strategy.BaseCurrency,
-					Total:    c.BuyPrice * c.Quantity,
+					Total:    c.Quantity,
 				},
 				c.Strategy.QuoteCurrency: types.Asset{
 					Currency: c.Strategy.QuoteCurrency,
-					Total:    c.Quantity,
+					Total:    c.BuyPrice.Mul(c.Quantity),
 				},
 			},
+			hasCounterOrder: true,
 		})
 	} else {
 		orders = append(orders, &CellOrder{
@@ -109,13 +110,14 @@ func (c *GridCell) _generateInitOrders(currentPrice fixedpoint.Value) []ICellOrd
 			Cost: map[string]types.Asset{
 				c.Strategy.BaseCurrency: types.Asset{
 					Currency: c.Strategy.BaseCurrency,
-					Total:    c.BuyPrice * c.Quantity,
+					Total:    c.Quantity,
 				},
 				c.Strategy.QuoteCurrency: types.Asset{
 					Currency: c.Strategy.QuoteCurrency,
-					Total:    c.Quantity,
+					Total:    c.BuyPrice.Mul(c.Quantity),
 				},
 			},
+			hasCounterOrder: true,
 		})
 		//buy
 	}
@@ -123,17 +125,25 @@ func (c *GridCell) _generateInitOrders(currentPrice fixedpoint.Value) []ICellOrd
 }
 
 func (c *GridCell) commitOpenOrder(form *ICellOrder) {
-	c.Orders[(*form).GetOrder().ClientOrderID] = form
-	(*form).UpdateOrderState(CellOrderStateOpen)
+
+	order := *form
+	if order.HasCounterOrder() {
+		c.Orders[order.GetOrder().ClientOrderID] = form
+	} else {
+		c.OneTimeOrders[order.GetOrder().ClientOrderID] = form
+	}
+
+	order.UpdateOrderState(CellOrderStateOpen)
 
 	state := c.Strategy.state
 	reInvProfit := *state.ReinvestingProfits
-	o := (*form).GetOrder()
+	o := order.GetOrder()
 
+	orderQuantity := fixedpoint.NewFromFloat(o.Quantity)
 	if o.Side == types.SideTypeSell {
-		reInvProfit[c.Market.BaseCurrency].Total += fixedpoint.NewFromFloat(o.Quantity) - (*form).GetCost()[c.Market.QuoteCurrency].Total
+		reInvProfit[c.Market.BaseCurrency].Total += orderQuantity - order.GetCost()[c.Market.BaseCurrency].Total
 	} else if o.Side == types.SideTypeBuy {
-		reInvProfit[c.Market.QuoteCurrency].Total += (fixedpoint.NewFromFloat(o.Quantity) - (*form).GetCost()[c.Market.QuoteCurrency].Total).Mul(c.BuyPrice)
+		reInvProfit[c.Market.QuoteCurrency].Total += (orderQuantity - order.GetCost()[c.Market.BaseCurrency].Total).Mul(c.BuyPrice)
 	}
 }
 
@@ -177,13 +187,13 @@ func (c *GridCell) UpdateProfit(pCellOrder *ICellOrder, submitOrder types.Submit
 	var quoteDiff fixedpoint.Value
 
 	if submitOrder.Side == types.SideTypeSell {
-		var reinvQuotes = fixedpoint.NewFromFloat(submitOrder.Quantity) - cellOrder.GetCost()[c.Strategy.QuoteCurrency].Total
+		var reinvQuotes = fixedpoint.NewFromFloat(submitOrder.Quantity) - cellOrder.GetCost()[c.Strategy.BaseCurrency].Total
 		quoteDiff = fixedpoint.NewFromFloat(submitOrder.Quantity).Mul(c.ProfitSpread) + reinvQuotes.Mul(fixedpoint.NewFromFloat(submitOrder.Price))
 		baseDiff = fixedpoint.NewFromInt(-1).Mul(reinvQuotes)
 		reInvProfitBaseAsset.Total += baseDiff
 
 	} else {
-		diffQuantity := fixedpoint.NewFromFloat(submitOrder.Quantity - cellOrder.GetCost()[c.Strategy.QuoteCurrency].Total.Float64())
+		diffQuantity := fixedpoint.NewFromFloat(submitOrder.Quantity - cellOrder.GetCost()[c.Strategy.BaseCurrency].Total.Float64())
 		//decrease the base asset for buying quote
 		quoteDiff = fixedpoint.NewFromInt(-1).Mul(diffQuantity.Mul(fixedpoint.NewFromFloat(submitOrder.Price)))
 		//increasing the quote

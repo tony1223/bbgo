@@ -375,7 +375,8 @@ func (s *Strategy) _handleFilledSubmitOrder(o types.Order, ctx context.Context) 
 
 		var nextOrders = cell.generateOrders()
 
-		for _, o2 := range nextOrders {
+		for ind := range nextOrders {
+			o2 := nextOrders[ind]
 			createOrders, err := s.OrderExecutor.SubmitOrders(ctx, o2.GetOrder())
 			if err != nil {
 				continue
@@ -465,7 +466,7 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 	if s.CatchUp {
 		session.MarketDataStream.OnKLineClosed(func(kline types.KLine) {
 			// update grid
-			//s.placeGridOrders(orderExecutor, session)
+			s.placeGridOrders(orderExecutor, session)
 		})
 	}
 

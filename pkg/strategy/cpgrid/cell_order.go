@@ -18,6 +18,7 @@ type ICellOrder interface {
 	UpdateOrderState(state CellOrderState)
 	GetCost() types.AssetMap
 	IsExcludeProfit() bool
+	HasCounterOrder() bool
 }
 type CellOrderState string
 
@@ -39,6 +40,11 @@ type CellOrder struct {
 	State            CellOrderState
 	Cost             types.AssetMap
 	ExcludeProfit    bool
+	hasCounterOrder  bool
+}
+
+func (c *CellOrder) HasCounterOrder() bool {
+	return c.hasCounterOrder
 }
 
 func (c *CellOrder) IsExcludeProfit() bool {
@@ -63,6 +69,10 @@ func (c *CellOrder) UpdateOrderState(state CellOrderState) {
 
 func (c *CellOrder) GenerateCounterOrder() []ICellOrder {
 
+	if !c.hasCounterOrder {
+		return []ICellOrder{}
+	}
+
 	state := c.Cell.Strategy.state
 	profit := *state.Profits
 	reInvProfit := *state.ReinvestingProfits
@@ -77,8 +87,16 @@ func (c *CellOrder) GenerateCounterOrder() []ICellOrder {
 
 	var cell = c.Cell
 	var orders []ICellOrder
+
+	var merge bool = true
 	if c.Order.Side == types.SideTypeBuy {
 		var quantity = workBaseProfit.Float64() - math.Mod(workBaseProfit.Float64(), market.StepSize)
+		var orderQuantity float64 = 0
+		if merge {
+			orderQuantity = cell.Quantity.Float64() + quantity
+		} else {
+			orderQuantity = cell.Quantity.Float64()
+		}
 		//sell
 		orders = append(orders, &CellOrder{
 			Order: types.SubmitOrder{
@@ -87,19 +105,58 @@ func (c *CellOrder) GenerateCounterOrder() []ICellOrder {
 				Side:          types.SideTypeSell,
 				Type:          types.OrderTypeLimit,
 				Market:        cell.Market,
-				Quantity:      cell.Quantity.Float64() + quantity,
+				Quantity:      orderQuantity,
 				Price:         cell.SellPrice.Float64(),
 				TimeInForce:   "GTC",
 				GroupID:       cell.GroupID,
 			},
-			PrevOrder: c,
-			Cell:      cell,
-			State:     CellOrderStateDraft,
-			Cost:      c.GetCost(),
+			PrevOrder:       c,
+			Cell:            cell,
+			State:           CellOrderStateDraft,
+			Cost:            c.GetCost(),
+			hasCounterOrder: true,
 		})
+
+		if quantity > 0 && !merge {
+			orders = append(orders, &CellOrder{
+				Order: types.SubmitOrder{
+					ClientOrderID: fmt.Sprintf("%s-%s", cell.Symbol, uuid.New().String()),
+					Symbol:        cell.Symbol,
+					Side:          types.SideTypeSell,
+					Type:          types.OrderTypeLimit,
+					Market:        cell.Market,
+					Quantity:      quantity,
+					Price:         cell.SellPrice.Float64(),
+					TimeInForce:   "GTC",
+					GroupID:       cell.GroupID,
+				},
+				PrevOrder: nil,
+				Cell:      cell,
+				State:     CellOrderStateDraft,
+				Cost: map[string]types.Asset{
+					c.Cell.Strategy.BaseCurrency: types.Asset{
+						Currency: c.Cell.Strategy.BaseCurrency,
+						Total:    fixedpoint.NewFromInt(0),
+					},
+					c.Cell.Strategy.QuoteCurrency: types.Asset{
+						Currency: c.Cell.Strategy.BaseCurrency,
+						Total:    fixedpoint.NewFromInt(0),
+					},
+				},
+				hasCounterOrder: false,
+			})
+		}
+
 	} else {
 		var quoteQuantity = workQuoteProfit.Div(cell.BuyPrice)
 		var quantity = quoteQuantity.Float64() - math.Mod(quoteQuantity.Float64(), market.StepSize)
+
+		var orderQuantity float64 = 0
+		if merge {
+			orderQuantity = cell.Quantity.Float64() + quantity
+		} else {
+			orderQuantity = cell.Quantity.Float64()
+		}
 		orders = append(orders, &CellOrder{
 			Order: types.SubmitOrder{
 				ClientOrderID: fmt.Sprintf("%s-%s", cell.Symbol, uuid.New().String()),
@@ -107,16 +164,48 @@ func (c *CellOrder) GenerateCounterOrder() []ICellOrder {
 				Side:          types.SideTypeBuy,
 				Type:          types.OrderTypeLimit,
 				Market:        cell.Market,
-				Quantity:      cell.Quantity.Float64() + quantity,
+				Quantity:      orderQuantity,
 				Price:         cell.BuyPrice.Float64(),
 				TimeInForce:   "GTC",
 				GroupID:       cell.GroupID,
 			},
-			PrevOrder: c,
-			Cell:      cell,
-			State:     CellOrderStateDraft,
-			Cost:      c.GetCost(),
+			PrevOrder:       c,
+			Cell:            cell,
+			State:           CellOrderStateDraft,
+			Cost:            c.GetCost(),
+			hasCounterOrder: true,
 		})
+
+		if quantity > 0 && !merge {
+			orders = append(orders, &CellOrder{
+				Order: types.SubmitOrder{
+					ClientOrderID: fmt.Sprintf("%s-%s", cell.Symbol, uuid.New().String()),
+					Symbol:        cell.Symbol,
+					Side:          types.SideTypeBuy,
+					Type:          types.OrderTypeLimit,
+					Market:        cell.Market,
+					Quantity:      quantity,
+					Price:         cell.BuyPrice.Float64() - cell.ProfitSpread.Float64(),
+					TimeInForce:   "GTC",
+					GroupID:       cell.GroupID,
+				},
+				PrevOrder: nil,
+				Cell:      cell,
+				State:     CellOrderStateDraft,
+				Cost: map[string]types.Asset{
+					c.Cell.Strategy.BaseCurrency: types.Asset{
+						Currency: c.Cell.Strategy.BaseCurrency,
+						Total:    fixedpoint.NewFromInt(0),
+					},
+					c.Cell.Strategy.QuoteCurrency: types.Asset{
+						Currency: c.Cell.Strategy.QuoteCurrency,
+						Total:    fixedpoint.NewFromInt(0),
+					},
+				},
+				hasCounterOrder: false,
+			})
+		}
+
 		//buy
 	}
 
