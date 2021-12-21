@@ -186,8 +186,8 @@ func (s *Strategy) InstanceID() string {
 func (s *Strategy) InitGrids() error {
 
 	priceRange := s.UpperPrice - s.LowerPrice
-	numGrids := fixedpoint.NewFromInt(s.GridNum)
-	gridSpread := priceRange.Div(numGrids)
+	numGrids := s.GridNum
+	gridSpread := priceRange.Div(fixedpoint.NewFromInt(numGrids - 1))
 
 	startPrice := fixedpoint.Min(s.UpperPrice,
 		s.LowerPrice)
@@ -199,7 +199,8 @@ func (s *Strategy) InitGrids() error {
 	}
 
 	s.state.Cells = nil
-	for price := startPrice; s.UpperPrice > price; price += gridSpread {
+	gridNum := 0
+	for price := startPrice; gridNum < numGrids; price += gridSpread {
 		spread := s._calcProfitSpread(price, types.SideTypeBuy)
 		var cell = GridCell{
 			Strategy:      s,
@@ -222,6 +223,7 @@ func (s *Strategy) InitGrids() error {
 		}
 
 		s.state.Cells = append(s.state.Cells, cell)
+		gridNum++
 	}
 
 	return nil
@@ -265,12 +267,13 @@ func (s *Strategy) placeGridOrders(orderExecutor bbgo.OrderExecutor, session *bb
 		return fmt.Errorf("cant get last price")
 	}
 
+	//counter offer first
+	s.handleCounterOrdersGenerate(context.Background())
+
 	orderForms, err := s.generateInitOrders(fixedpoint.NewFromFloat(lastPrice))
 	if err != nil {
 		return err
 	}
-
-	s.handleCounterOrdersGenerate(context.Background())
 
 	//if len(orderForms) == 0 {
 	//	return errors.New("none of Order is generated")
