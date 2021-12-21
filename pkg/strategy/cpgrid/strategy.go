@@ -3,13 +3,14 @@ package cpgrid
 import (
 	"context"
 	"fmt"
+	"github.com/c9s/bbgo/pkg/exchange/max"
+	"github.com/c9s/bbgo/pkg/indicator"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 	"sort"
 	"sync"
 
 	"github.com/c9s/bbgo/pkg/bbgo"
-	"github.com/c9s/bbgo/pkg/exchange/max"
 	"github.com/c9s/bbgo/pkg/fixedpoint"
 	"github.com/c9s/bbgo/pkg/service"
 	"github.com/c9s/bbgo/pkg/types"
@@ -60,6 +61,8 @@ type State struct {
 	ReinvestingProfits *AssetMap
 	LockProfits        *AssetMap
 	ProfitStats        bbgo.ProfitStats `json:"profitStats,omitempty"`
+	UsingLockProfits   bool
+	ShouldReInv        bool
 }
 
 type Strategy struct {
@@ -116,6 +119,11 @@ type Strategy struct {
 	KeepBaseCurrency bool `json:"keepBaseCurrency" yaml:"keepBaseCurrency"`
 
 	ReinvestRate fixedpoint.Value `json:"reinvestRate,omitempty" yaml:"reinvestRate"`
+
+	ReinvBolInterval types.IntervalWindow `json:"ReinvBolInterval"`
+	LockReinvPrice   fixedpoint.Value     `json:"LockReinvPrice"`
+
+	ReinvEmaIndicator *indicator.BOLL
 
 	state *State
 
@@ -287,8 +295,15 @@ func (s *Strategy) placeGridOrders(orderExecutor bbgo.OrderExecutor, session *bb
 	return nil
 }
 
+var zeroiw = types.IntervalWindow{}
+
 func (s *Strategy) Subscribe(session *bbgo.ExchangeSession) {
 	session.Subscribe(types.KLineChannel, s.Symbol, types.SubscribeOptions{Interval: "1m"})
+
+	if s.ReinvBolInterval != zeroiw {
+		session.Subscribe(types.KLineChannel, s.Symbol,
+			types.SubscribeOptions{Interval: string(s.ReinvBolInterval.Interval)})
+	}
 }
 
 func (s *Strategy) LoadState() error {
@@ -442,6 +457,15 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 	s.tradeCollector.BindStream(session.UserDataStream)
 	s.InitGrids()
 
+	standardIndicatorSet, ok := session.StandardIndicatorSet(s.Symbol)
+	if !ok {
+		return fmt.Errorf("standardIndicatorSet is nil, symbol %s", s.Symbol)
+	}
+
+	if s.ReinvBolInterval != zeroiw {
+		s.ReinvEmaIndicator = standardIndicatorSet.BOLL(s.ReinvBolInterval, 1.0)
+	}
+
 	s.Graceful.OnShutdown(func(ctx context.Context, wg *sync.WaitGroup) {
 		defer wg.Done()
 
@@ -465,8 +489,13 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 
 	if s.CatchUp {
 		session.MarketDataStream.OnKLineClosed(func(kline types.KLine) {
-			// update grid
-			s.placeGridOrders(orderExecutor, session)
+			if kline.Interval == types.Interval1m {
+				// update grid
+				s.placeGridOrders(orderExecutor, session)
+
+				//		session.Exchange.QueryOpenOrders()
+				// re-check orders
+			}
 		})
 	}
 

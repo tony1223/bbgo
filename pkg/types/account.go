@@ -46,7 +46,7 @@ type Asset struct {
 	InUSD     fixedpoint.Value `json:"inUSD" db:"inUSD"`
 	InBTC     fixedpoint.Value `json:"inBTC" db:"inBTC"`
 	Time      time.Time        `json:"time" db:"time"`
-	Lock      fixedpoint.Value `json:"lock" db:"lock" `
+	Locked    fixedpoint.Value `json:"lock" db:"lock" `
 	Available fixedpoint.Value `json:"available"  db:"available"`
 }
 
@@ -152,7 +152,7 @@ func (m BalanceMap) Assets(prices map[string]float64) AssetMap {
 			Currency:  currency,
 			Total:     b.Available + b.Locked,
 			Time:      now,
-			Lock:      b.Locked,
+			Locked:    b.Locked,
 			Available: b.Available,
 		}
 

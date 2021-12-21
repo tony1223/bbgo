@@ -88,9 +88,12 @@ func (c *CellOrder) GenerateCounterOrder() []ICellOrder {
 	var cell = c.Cell
 	var orders []ICellOrder
 
+	indicator := c.Cell.Strategy.ReinvEmaIndicator
+
 	var merge bool = true
 	if c.Order.Side == types.SideTypeBuy {
 		var quantity = workBaseProfit.Float64() - math.Mod(workBaseProfit.Float64(), market.StepSize)
+
 		var orderQuantity float64 = 0
 		if merge {
 			orderQuantity = cell.Quantity.Float64() + quantity
@@ -150,7 +153,10 @@ func (c *CellOrder) GenerateCounterOrder() []ICellOrder {
 	} else {
 		var quoteQuantity = workQuoteProfit.Div(cell.BuyPrice)
 		var quantity = quoteQuantity.Float64() - math.Mod(quoteQuantity.Float64(), market.StepSize)
-
+		// in case we dont buy in relative high price.
+		if indicator != nil && indicator.LastUpBand() != 0 && indicator.LastUpBand() < cell.SellPrice.Float64() {
+			quantity = 0
+		}
 		var orderQuantity float64 = 0
 		if merge {
 			orderQuantity = cell.Quantity.Float64() + quantity
