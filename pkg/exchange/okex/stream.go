@@ -182,7 +182,7 @@ func NewStream(client *okexapi.RestClient) *Stream {
 				},
 			}
 
-			log.Infof("sending login request: %+v", op)
+			log.Infof("sending okex login request")
 			err := stream.Conn.WriteJSON(op)
 			if err != nil {
 				log.WithError(err).Errorf("can not send login message")
