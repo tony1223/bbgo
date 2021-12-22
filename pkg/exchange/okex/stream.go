@@ -241,7 +241,6 @@ func (s *Stream) connect(ctx context.Context) error {
 		url = okexapi.PrivateWebSocketURL
 	}
 
-
 	conn, err := s.StandardStream.Dial(url)
 	if err != nil {
 		return err
@@ -332,7 +331,7 @@ func (s *Stream) read(ctx context.Context) {
 				continue
 			}
 
-			e, err := Parse(string(message))
+			e, channel, err := Parse(string(message))
 			if err != nil {
 				log.WithError(err).Error("message parse error")
 			}
@@ -343,8 +342,11 @@ func (s *Stream) read(ctx context.Context) {
 					s.EmitEvent(*et)
 
 				case *BookData:
-					s.EmitBookData(*et)
-
+					//there's "books" for 400 depth and books5 for 5 depth
+					if channel != "books5" {
+						s.EmitBookData(*et)
+					}
+					s.EmitBookTickerUpdate(et.BookTicker())
 				case *Candle:
 					s.EmitCandleData(*et)
 

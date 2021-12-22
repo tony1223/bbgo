@@ -14,10 +14,10 @@ import (
 	"github.com/valyala/fastjson"
 )
 
-func Parse(str string) (interface{}, error) {
+func Parse(str string) (interface{}, string, error) {
 	v, err := fastjson.Parse(str)
 	if err != nil {
-		return nil, err
+		return nil, "", err
 	}
 
 	if v.Exists("event") {
@@ -28,7 +28,7 @@ func Parse(str string) (interface{}, error) {
 		return parseData(v)
 	}
 
-	return nil, nil
+	return nil, "", nil
 }
 
 type WebSocketEvent struct {
@@ -38,7 +38,7 @@ type WebSocketEvent struct {
 	Arg     interface{} `json:"arg,omitempty"`
 }
 
-func parseEvent(v *fastjson.Value) (*WebSocketEvent, error) {
+func parseEvent(v *fastjson.Value) (*WebSocketEvent, string, error) {
 	// event could be "subscribe", "unsubscribe" or "error"
 	event := string(v.GetStringBytes("event"))
 	code := string(v.GetStringBytes("code"))
@@ -49,7 +49,7 @@ func parseEvent(v *fastjson.Value) (*WebSocketEvent, error) {
 		Code:    code,
 		Message: message,
 		Arg:     arg,
-	}, nil
+	}, event, nil
 }
 
 type BookData struct {
@@ -60,6 +60,20 @@ type BookData struct {
 	Asks                 []BookEntry
 	MillisecondTimestamp int64
 	Checksum             int
+}
+
+func (data *BookData) BookTicker() types.BookTicker {
+
+	var askBookData BookEntry = data.Asks[0]
+	var bidBookData BookEntry = data.Bids[0]
+
+	return types.BookTicker{
+		Symbol:   data.Symbol,
+		Buy:      bidBookData.Price,
+		BuySize:  bidBookData.Price,
+		Sell:     askBookData.Price,
+		SellSize: askBookData.Volume,
+	}
 }
 
 func (data *BookData) Book() types.SliceOrderBook {
@@ -306,26 +320,30 @@ func parseOrder(v *fastjson.Value) ([]okexapi.OrderDetails, error) {
 	return orderDetails, nil
 }
 
-func parseData(v *fastjson.Value) (interface{}, error) {
+func parseData(v *fastjson.Value) (interface{}, string, error) {
 
 	channel := string(v.GetStringBytes("arg", "channel"))
 
 	switch channel {
+	case "books5":
+		data, err := parseBookData(v)
+		return data, channel, err
 	case "books":
-		return parseBookData(v)
-
+		data, err := parseBookData(v)
+		return data, channel, err
 	case "account":
-		return parseAccount(v)
-
+		data, err := parseAccount(v)
+		return data, channel, err
 	case "orders":
-		return parseOrder(v)
-
+		data, err := parseOrder(v)
+		return data, channel, err
 	default:
 		if strings.HasPrefix(channel, "candle") {
-			return parseCandle(channel, v)
+			data, err := parseCandle(channel, v)
+			return data, channel, err
 		}
 
 	}
 
-	return nil, nil
+	return nil, "", nil
 }
