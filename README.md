@@ -37,6 +37,7 @@ Get your exchange API key and secret after you register the accounts (you can ch
 - Binance: <https://www.binancezh.com/en/register?ref=VGDGLT80>
 - FTX: <https://ftx.com/#a=7710474>
 - OKEx: <https://www.okex.com/join/2412712?src=from:ios-share>
+- Kucoin: <https://www.kucoin.com/ucenter/signup?rcode=r3KX2D4>
 
 Since the exchange implementation and support are done by a small team, if you like the work they've done for you, It
 would be great if you can use their referral code as your support to them. :-D
@@ -68,19 +69,25 @@ See [Build from source](./doc/build-from-source.md)
 Add your dotenv file:
 
 ```sh
-# if you have one
+# for Binance Exchange, if you have one
 BINANCE_API_KEY=
 BINANCE_API_SECRET=
 
-# if you have one
+# for MAX exchange, if you have one
 MAX_API_KEY=
 MAX_API_SECRET=
 
-# if you have one
+# for FTX exchange, if you have one
 FTX_API_KEY=
 FTX_API_SECRET=
 # specify it if credentials are for subaccount
 FTX_SUBACCOUNT=
+
+# for OKEx exchange, if you have one
+OKEX_API_KEY=
+OKEX_API_SECRET=
+OKEX_API_PASSPHRASE
+
 ```
 
 Prepare your dotenv file `.env.local` and BBGO yaml config file `bbgo.yaml`.

@@ -294,7 +294,7 @@ func toGlobalTrade(t binance.TradeV3, isMargin bool) (*types.Trade, error) {
 	}
 
 	return &types.Trade{
-		ID:            t.ID,
+		ID:            uint64(t.ID),
 		OrderID:       uint64(t.OrderID),
 		Price:         price,
 		Symbol:        t.Symbol,
@@ -347,7 +347,7 @@ func toGlobalFuturesTrade(t futures.AccountTrade) (*types.Trade, error) {
 	}
 
 	return &types.Trade{
-		ID:            t.ID,
+		ID:            uint64(t.ID),
 		OrderID:       uint64(t.OrderID),
 		Price:         price,
 		Symbol:        t.Symbol,
@@ -498,9 +498,10 @@ func convertSubscription(s types.Subscription) string {
 	switch s.Channel {
 	case types.KLineChannel:
 		return fmt.Sprintf("%s@%s_%s", strings.ToLower(s.Symbol), s.Channel, s.Options.String())
-
 	case types.BookChannel:
 		return fmt.Sprintf("%s@depth", strings.ToLower(s.Symbol))
+	case types.BookTickerChannel:
+		return fmt.Sprintf("%s@bookTicker", strings.ToLower(s.Symbol))
 	}
 
 	return fmt.Sprintf("%s@%s", strings.ToLower(s.Symbol), s.Channel)

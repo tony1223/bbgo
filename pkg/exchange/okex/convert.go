@@ -96,6 +96,11 @@ func convertSubscription(s types.Subscription) (WebsocketSubscription, error) {
 			Channel:      "books",
 			InstrumentID: toLocalSymbol(s.Symbol),
 		}, nil
+	case types.BookTickerChannel:
+		return WebsocketSubscription{
+			Channel:      "books5",
+			InstrumentID: toLocalSymbol(s.Symbol),
+		}, nil
 	}
 
 	return WebsocketSubscription{}, fmt.Errorf("unsupported public stream channel %s", s.Channel)
@@ -131,7 +136,7 @@ func toGlobalTrades(orderDetails []okexapi.OrderDetails) ([]types.Trade, error) 
 		side := types.SideType(strings.ToUpper(string(orderDetail.Side)))
 
 		trades = append(trades, types.Trade{
-			ID:            tradeID,
+			ID:            uint64(tradeID),
 			OrderID:       uint64(orderID),
 			Exchange:      types.ExchangeOKEx,
 			Price:         orderDetail.LastFilledPrice.Float64(),

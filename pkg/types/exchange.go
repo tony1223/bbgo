@@ -44,6 +44,7 @@ const (
 	ExchangeBinance  = ExchangeName("binance")
 	ExchangeFTX      = ExchangeName("ftx")
 	ExchangeOKEx     = ExchangeName("okex")
+	ExchangeKucoin   = ExchangeName("kucoin")
 	ExchangeBacktest = ExchangeName("backtest")
 )
 
@@ -125,5 +126,5 @@ type TradeQueryOptions struct {
 	StartTime   *time.Time
 	EndTime     *time.Time
 	Limit       int64
-	LastTradeID int64
+	LastTradeID uint64
 }

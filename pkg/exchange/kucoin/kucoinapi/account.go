@@ -8,18 +8,18 @@ type AccountService struct {
 
 type SubAccount struct {
 	UserID string `json:"userId"`
-	Name string `json:"subName"`
-	Type string `json:"type"`
+	Name   string `json:"subName"`
+	Type   string `json:"type"`
 	Remark string `json:"remarks"`
 }
 
 func (s *AccountService) QuerySubAccounts() ([]SubAccount, error) {
-	req, err := s.client.newAuthenticatedRequest("GET", "/api/v1/sub/user", nil, nil)
+	req, err := s.client.NewAuthenticatedRequest("GET", "/api/v1/sub/user", nil, nil)
 	if err != nil {
 		return nil, err
 	}
 
-	response, err := s.client.sendRequest(req)
+	response, err := s.client.SendRequest(req)
 	if err != nil {
 		return nil, err
 	}
@@ -38,28 +38,28 @@ func (s *AccountService) QuerySubAccounts() ([]SubAccount, error) {
 }
 
 type Account struct {
-	ID string `json:"id"`
-	Currency string `json:"currency"`
-	Type string `json:"type"`
-	Balance fixedpoint.Value `json:"balance"`
+	ID        string           `json:"id"`
+	Currency  string           `json:"currency"`
+	Type      AccountType      `json:"type"`
+	Balance   fixedpoint.Value `json:"balance"`
 	Available fixedpoint.Value `json:"available"`
-	Holds fixedpoint.Value `json:"holds"`
+	Holds     fixedpoint.Value `json:"holds"`
 }
 
 func (s *AccountService) ListAccounts() ([]Account, error) {
-	req, err := s.client.newAuthenticatedRequest("GET", "/api/v1/accounts", nil, nil)
+	req, err := s.client.NewAuthenticatedRequest("GET", "/api/v1/accounts", nil, nil)
 	if err != nil {
 		return nil, err
 	}
 
-	response, err := s.client.sendRequest(req)
+	response, err := s.client.SendRequest(req)
 	if err != nil {
 		return nil, err
 	}
 
 	var apiResponse struct {
-		Code    string       `json:"code"`
-		Message string       `json:"msg"`
+		Code    string    `json:"code"`
+		Message string    `json:"msg"`
 		Data    []Account `json:"data"`
 	}
 
@@ -71,19 +71,19 @@ func (s *AccountService) ListAccounts() ([]Account, error) {
 }
 
 func (s *AccountService) GetAccount(accountID string) (*Account, error) {
-	req, err := s.client.newAuthenticatedRequest("GET", "/api/v1/accounts/" + accountID, nil, nil)
+	req, err := s.client.NewAuthenticatedRequest("GET", "/api/v1/accounts/"+accountID, nil, nil)
 	if err != nil {
 		return nil, err
 	}
 
-	response, err := s.client.sendRequest(req)
+	response, err := s.client.SendRequest(req)
 	if err != nil {
 		return nil, err
 	}
 
 	var apiResponse struct {
-		Code    string       `json:"code"`
-		Message string       `json:"msg"`
+		Code    string   `json:"code"`
+		Message string   `json:"msg"`
 		Data    *Account `json:"data"`
 	}
 
