@@ -36,8 +36,6 @@ type Stream struct {
 	connCtx    context.Context
 	connCancel context.CancelFunc
 
-	publicOnly bool
-
 	// public callbacks
 	candleDataCallbacks   []func(candle Candle)
 	bookDataCallbacks     []func(book BookData)
@@ -139,7 +137,7 @@ func NewStream(client *okexapi.RestClient) *Stream {
 	})
 
 	stream.OnConnect(func() {
-		if stream.publicOnly {
+		if stream.PublicOnly {
 			var subs []WebsocketSubscription
 			for _, subscription := range stream.Subscriptions {
 				sub, err := convertSubscription(subscription)
@@ -193,10 +191,6 @@ func NewStream(client *okexapi.RestClient) *Stream {
 	return stream
 }
 
-func (s *Stream) SetPublicOnly() {
-	s.publicOnly = true
-}
-
 func (s *Stream) Close() error {
 	return nil
 }
@@ -235,7 +229,7 @@ func (s *Stream) Reconnector(ctx context.Context) {
 func (s *Stream) connect(ctx context.Context) error {
 	// when in public mode, the listen key is an empty string
 	var url string
-	if s.publicOnly {
+	if s.PublicOnly {
 		url = okexapi.PublicWebSocketURL
 	} else {
 		url = okexapi.PrivateWebSocketURL
@@ -331,7 +325,7 @@ func (s *Stream) read(ctx context.Context) {
 				continue
 			}
 
-			e, channel, err := Parse(string(message))
+			e, err := Parse(string(message))
 			if err != nil {
 				log.WithError(err).Error("message parse error")
 			}
@@ -343,7 +337,7 @@ func (s *Stream) read(ctx context.Context) {
 
 				case *BookData:
 					//there's "books" for 400 depth and books5 for 5 depth
-					if channel != "books5" {
+					if et.channel != "books5" {
 						s.EmitBookData(*et)
 					}
 					s.EmitBookTickerUpdate(et.BookTicker())

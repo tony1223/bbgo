@@ -6,15 +6,12 @@ import (
 	"crypto/sha256"
 	"encoding/base64"
 	"encoding/json"
-	"fmt"
 	"net/http"
 	"net/url"
 	"strconv"
 	"strings"
 	"time"
 
-	"github.com/c9s/bbgo/pkg/fixedpoint"
-	"github.com/c9s/bbgo/pkg/types"
 	"github.com/c9s/bbgo/pkg/util"
 	"github.com/pkg/errors"
 )
@@ -34,6 +31,7 @@ type RestClient struct {
 	AccountService    *AccountService
 	MarketDataService *MarketDataService
 	TradeService      *TradeService
+	BulletService     *BulletService
 }
 
 func NewClient() *RestClient {
@@ -53,6 +51,7 @@ func NewClient() *RestClient {
 	client.AccountService = &AccountService{client: client}
 	client.MarketDataService = &MarketDataService{client: client}
 	client.TradeService = &TradeService{client: client}
+	client.BulletService = &BulletService{client: client}
 	return client
 }
 
@@ -63,7 +62,7 @@ func (c *RestClient) Auth(key, secret, passphrase string) {
 }
 
 // NewRequest create new API request. Relative url can be provided in refURL.
-func (c *RestClient) newRequest(method, refURL string, params url.Values, body []byte) (*http.Request, error) {
+func (c *RestClient) NewRequest(method, refURL string, params url.Values, body []byte) (*http.Request, error) {
 	rel, err := url.Parse(refURL)
 	if err != nil {
 		return nil, err
@@ -78,7 +77,7 @@ func (c *RestClient) newRequest(method, refURL string, params url.Values, body [
 }
 
 // sendRequest sends the request to the API server and handle the response
-func (c *RestClient) sendRequest(req *http.Request) (*util.Response, error) {
+func (c *RestClient) SendRequest(req *http.Request) (*util.Response, error) {
 	resp, err := c.client.Do(req)
 	if err != nil {
 		return nil, err
@@ -99,7 +98,7 @@ func (c *RestClient) sendRequest(req *http.Request) (*util.Response, error) {
 }
 
 // newAuthenticatedRequest creates new http request for authenticated routes.
-func (c *RestClient) newAuthenticatedRequest(method, refURL string, params url.Values, payload interface{}) (*http.Request, error) {
+func (c *RestClient) NewAuthenticatedRequest(method, refURL string, params url.Values, payload interface{}) (*http.Request, error) {
 	if len(c.Key) == 0 {
 		return nil, errors.New("empty api key")
 	}
@@ -123,31 +122,10 @@ func (c *RestClient) newAuthenticatedRequest(method, refURL string, params url.V
 		path += "?" + rel.RawQuery
 	}
 
-	// set location to UTC so that it outputs "2020-12-08T09:08:57.715Z"
-	t := time.Now().In(time.UTC)
-	// timestamp := t.Format("2006-01-02T15:04:05.999Z07:00")
-	timestamp := strconv.FormatInt(t.UnixNano() / int64(time.Millisecond), 10)
-
-	var body []byte
-
-	if payload != nil {
-		switch v := payload.(type) {
-		case string:
-			body = []byte(v)
-
-		case []byte:
-			body = v
-
-		default:
-			body, err = json.Marshal(v)
-			if err != nil {
-				return nil, err
-			}
-		}
+	body, err := castPayload(payload)
+	if err != nil {
+		return nil, err
 	}
-
-	signKey := timestamp + strings.ToUpper(method) + path + string(body)
-	signature := sign(c.Secret, signKey)
 
 	req, err := http.NewRequest(method, pathURL.String(), bytes.NewReader(body))
 	if err != nil {
@@ -156,151 +134,28 @@ func (c *RestClient) newAuthenticatedRequest(method, refURL string, params url.V
 
 	req.Header.Add("Content-Type", "application/json")
 	req.Header.Add("Accept", "application/json")
+
+	// Build authentication headers
+	c.attachAuthHeaders(req, method, path, body)
+	return req, nil
+}
+
+func (c *RestClient) attachAuthHeaders(req *http.Request, method string, path string, body []byte) {
+	// Set location to UTC so that it outputs "2020-12-08T09:08:57.715Z"
+	t := time.Now().In(time.UTC)
+	// timestamp := t.Format("2006-01-02T15:04:05.999Z07:00")
+	timestamp := strconv.FormatInt(t.UnixNano()/int64(time.Millisecond), 10)
+	signKey := timestamp + strings.ToUpper(method) + path + string(body)
+	signature := sign(c.Secret, signKey)
+
 	req.Header.Add("KC-API-KEY", c.Key)
 	req.Header.Add("KC-API-SIGN", signature)
 	req.Header.Add("KC-API-TIMESTAMP", timestamp)
 	req.Header.Add("KC-API-PASSPHRASE", sign(c.Secret, c.Passphrase))
 	req.Header.Add("KC-API-KEY-VERSION", c.KeyVersion)
-	return req, nil
 }
 
-type BalanceDetail struct {
-	Currency                string                     `json:"ccy"`
-	Available               fixedpoint.Value           `json:"availEq"`
-	CashBalance             fixedpoint.Value           `json:"cashBal"`
-	OrderFrozen             fixedpoint.Value           `json:"ordFrozen"`
-	Frozen                  fixedpoint.Value           `json:"frozenBal"`
-	Equity                  fixedpoint.Value           `json:"eq"`
-	EquityInUSD             fixedpoint.Value           `json:"eqUsd"`
-	UpdateTime              types.MillisecondTimestamp `json:"uTime"`
-	UnrealizedProfitAndLoss fixedpoint.Value           `json:"upl"`
-}
-
-type AssetBalance struct {
-	Currency  string           `json:"ccy"`
-	Balance   fixedpoint.Value `json:"bal"`
-	Frozen    fixedpoint.Value `json:"frozenBal,omitempty"`
-	Available fixedpoint.Value `json:"availBal,omitempty"`
-}
-
-type AssetBalanceList []AssetBalance
-
-func (c *RestClient) AssetBalances() (AssetBalanceList, error) {
-	req, err := c.newAuthenticatedRequest("GET", "/api/v5/asset/balances", nil, nil)
-	if err != nil {
-		return nil, err
-	}
-
-	response, err := c.sendRequest(req)
-	if err != nil {
-		return nil, err
-	}
-
-	var balanceResponse struct {
-		Code    string           `json:"code"`
-		Message string           `json:"msg"`
-		Data    AssetBalanceList `json:"data"`
-	}
-	if err := response.DecodeJSON(&balanceResponse); err != nil {
-		return nil, err
-	}
-
-	return balanceResponse.Data, nil
-}
-
-type AssetCurrency struct {
-	Currency               string           `json:"ccy"`
-	Name                   string           `json:"name"`
-	Chain                  string           `json:"chain"`
-	CanDeposit             bool             `json:"canDep"`
-	CanWithdraw            bool             `json:"canWd"`
-	CanInternal            bool             `json:"canInternal"`
-	MinWithdrawalFee       fixedpoint.Value `json:"minFee"`
-	MaxWithdrawalFee       fixedpoint.Value `json:"maxFee"`
-	MinWithdrawalThreshold fixedpoint.Value `json:"minWd"`
-}
-
-func (c *RestClient) AssetCurrencies() ([]AssetCurrency, error) {
-	req, err := c.newAuthenticatedRequest("GET", "/api/v5/asset/currencies", nil, nil)
-	if err != nil {
-		return nil, err
-	}
-
-	response, err := c.sendRequest(req)
-	if err != nil {
-		return nil, err
-	}
-
-	var currencyResponse struct {
-		Code    string          `json:"code"`
-		Message string          `json:"msg"`
-		Data    []AssetCurrency `json:"data"`
-	}
-
-	if err := response.DecodeJSON(&currencyResponse); err != nil {
-		return nil, err
-	}
-
-	return currencyResponse.Data, nil
-}
-
-type MarketTicker struct {
-	InstrumentType string `json:"instType"`
-	InstrumentID   string `json:"instId"`
-
-	// last traded price
-	Last fixedpoint.Value `json:"last"`
-
-	// last traded size
-	LastSize fixedpoint.Value `json:"lastSz"`
-
-	AskPrice fixedpoint.Value `json:"askPx"`
-	AskSize  fixedpoint.Value `json:"askSz"`
-
-	BidPrice fixedpoint.Value `json:"bidPx"`
-	BidSize  fixedpoint.Value `json:"bidSz"`
-
-	Open24H           fixedpoint.Value `json:"open24h"`
-	High24H           fixedpoint.Value `json:"high24H"`
-	Low24H            fixedpoint.Value `json:"low24H"`
-	Volume24H         fixedpoint.Value `json:"vol24h"`
-	VolumeCurrency24H fixedpoint.Value `json:"volCcy24h"`
-
-	// Millisecond timestamp
-	Timestamp types.MillisecondTimestamp `json:"ts"`
-}
-
-func (c *RestClient) MarketTicker(instId string) (*MarketTicker, error) {
-	// SPOT, SWAP, FUTURES, OPTION
-	var params = url.Values{}
-	params.Add("instId", instId)
-
-	req, err := c.newRequest("GET", "/api/v5/market/ticker", params, nil)
-	if err != nil {
-		return nil, err
-	}
-
-	response, err := c.sendRequest(req)
-	if err != nil {
-		return nil, err
-	}
-
-	var tickerResponse struct {
-		Code    string         `json:"code"`
-		Message string         `json:"msg"`
-		Data    []MarketTicker `json:"data"`
-	}
-	if err := response.DecodeJSON(&tickerResponse); err != nil {
-		return nil, err
-	}
-
-	if len(tickerResponse.Data) == 0 {
-		return nil, fmt.Errorf("ticker of %s not found", instId)
-	}
-
-	return &tickerResponse.Data[0], nil
-}
-
+// sign uses sha256 to sign the payload with the given secret
 func sign(secret, payload string) string {
 	var sig = hmac.New(sha256.New, []byte(secret))
 	_, err := sig.Write([]byte(payload))
@@ -309,4 +164,22 @@ func sign(secret, payload string) string {
 	}
 
 	return base64.StdEncoding.EncodeToString(sig.Sum(nil))
+}
+
+func castPayload(payload interface{}) ([]byte, error) {
+	if payload != nil {
+		switch v := payload.(type) {
+		case string:
+			return []byte(v), nil
+
+		case []byte:
+			return v, nil
+
+		default:
+			body, err := json.Marshal(v)
+			return body, err
+		}
+	}
+
+	return nil, nil
 }

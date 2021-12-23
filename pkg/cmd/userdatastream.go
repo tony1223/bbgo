@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"syscall"
+	"time"
 
 	"github.com/c9s/bbgo/pkg/bbgo"
 	"github.com/c9s/bbgo/pkg/cmd/cmdutil"
@@ -40,23 +41,31 @@ var userDataStreamCmd = &cobra.Command{
 
 		s := session.Exchange.NewStream()
 		s.OnOrderUpdate(func(order types.Order) {
-			log.Infof("order update: %+v", order)
+			log.Infof("orderUpdate: %+v", order)
 		})
 		s.OnTradeUpdate(func(trade types.Trade) {
-			log.Infof("trade update: %+v", trade)
+			log.Infof("tradeUpdate: %+v", trade)
 		})
 		s.OnBalanceUpdate(func(trade types.BalanceMap) {
-			log.Infof("balance update: %+v", trade)
+			log.Infof("balanceUpdate: %+v", trade)
 		})
 		s.OnBalanceSnapshot(func(trade types.BalanceMap) {
-			log.Infof("balance snapshot: %+v", trade)
+			log.Infof("balanceSnapshot: %+v", trade)
 		})
 
 		log.Infof("connecting...")
 		if err := s.Connect(ctx); err != nil {
 			return fmt.Errorf("failed to connect to %s", sessionName)
 		}
+
 		log.Infof("connected")
+		defer func() {
+			log.Infof("closing connection...")
+			if err := s.Close(); err != nil {
+				log.WithError(err).Errorf("connection close error")
+			}
+			time.Sleep(1 * time.Second)
+		}()
 
 		cmdutil.WaitForSignal(ctx, syscall.SIGINT, syscall.SIGTERM)
 		return nil

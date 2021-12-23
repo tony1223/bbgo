@@ -14,10 +14,10 @@ import (
 	"github.com/valyala/fastjson"
 )
 
-func Parse(str string) (interface{}, string, error) {
+func Parse(str string) (interface{}, error) {
 	v, err := fastjson.Parse(str)
 	if err != nil {
-		return nil, "", err
+		return nil, err
 	}
 
 	if v.Exists("event") {
@@ -28,7 +28,7 @@ func Parse(str string) (interface{}, string, error) {
 		return parseData(v)
 	}
 
-	return nil, "", nil
+	return nil, nil
 }
 
 type WebSocketEvent struct {
@@ -38,7 +38,7 @@ type WebSocketEvent struct {
 	Arg     interface{} `json:"arg,omitempty"`
 }
 
-func parseEvent(v *fastjson.Value) (*WebSocketEvent, string, error) {
+func parseEvent(v *fastjson.Value) (*WebSocketEvent, error) {
 	// event could be "subscribe", "unsubscribe" or "error"
 	event := string(v.GetStringBytes("event"))
 	code := string(v.GetStringBytes("code"))
@@ -49,7 +49,7 @@ func parseEvent(v *fastjson.Value) (*WebSocketEvent, string, error) {
 		Code:    code,
 		Message: message,
 		Arg:     arg,
-	}, event, nil
+	}, nil
 }
 
 type BookData struct {
@@ -60,6 +60,7 @@ type BookData struct {
 	Asks                 []BookEntry
 	MillisecondTimestamp int64
 	Checksum             int
+	channel              string
 }
 
 func (data *BookData) BookTicker() types.BookTicker {
@@ -320,30 +321,30 @@ func parseOrder(v *fastjson.Value) ([]okexapi.OrderDetails, error) {
 	return orderDetails, nil
 }
 
-func parseData(v *fastjson.Value) (interface{}, string, error) {
+func parseData(v *fastjson.Value) (interface{}, error) {
 
 	channel := string(v.GetStringBytes("arg", "channel"))
 
 	switch channel {
 	case "books5":
 		data, err := parseBookData(v)
-		return data, channel, err
+		data.channel = channel
+		return data, err
 	case "books":
 		data, err := parseBookData(v)
-		return data, channel, err
+		data.channel = channel
+		return data, err
 	case "account":
-		data, err := parseAccount(v)
-		return data, channel, err
+		return parseAccount(v)
 	case "orders":
-		data, err := parseOrder(v)
-		return data, channel, err
+		return parseOrder(v)
 	default:
 		if strings.HasPrefix(channel, "candle") {
 			data, err := parseCandle(channel, v)
-			return data, channel, err
+			return data, err
 		}
 
 	}
 
-	return nil, "", nil
+	return nil, nil
 }

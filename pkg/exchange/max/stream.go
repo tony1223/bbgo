@@ -20,8 +20,6 @@ type Stream struct {
 	types.StandardStream
 
 	websocketService *max.WebSocketService
-
-	publicOnly bool
 }
 
 func NewStream(key, secret string) *Stream {
@@ -152,10 +150,6 @@ func NewStream(key, secret string) *Stream {
 	return stream
 }
 
-func (s *Stream) SetPublicOnly() {
-	s.publicOnly = true
-}
-
 func (s *Stream) Subscribe(channel types.Channel, symbol string, options types.SubscribeOptions) {
 	opt := max.SubscribeOptions{}
 
@@ -213,7 +207,7 @@ func convertWebSocketTrade(t max.TradeUpdate) (*types.Trade, error) {
 	}
 
 	return &types.Trade{
-		ID:            int64(t.ID),
+		ID:            t.ID,
 		OrderID:       t.OrderID,
 		Symbol:        toGlobalSymbol(t.Market),
 		Exchange:      types.ExchangeMax,
