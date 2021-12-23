@@ -103,7 +103,7 @@ func (c *CellOrder) GenerateCounterOrder() []ICellOrder {
 		//sell
 		orders = append(orders, &CellOrder{
 			Order: types.SubmitOrder{
-				ClientOrderID: fmt.Sprintf("%s-%s", cell.Symbol, uuid.New().String()),
+				ClientOrderID: fmt.Sprintf("%s", uuid.New().String()),
 				Symbol:        cell.Symbol,
 				Side:          types.SideTypeSell,
 				Type:          types.OrderTypeLimit,
@@ -123,7 +123,7 @@ func (c *CellOrder) GenerateCounterOrder() []ICellOrder {
 		if quantity > 0 && !merge {
 			orders = append(orders, &CellOrder{
 				Order: types.SubmitOrder{
-					ClientOrderID: fmt.Sprintf("%s-%s", cell.Symbol, uuid.New().String()),
+					ClientOrderID: fmt.Sprintf("%s", uuid.New().String()),
 					Symbol:        cell.Symbol,
 					Side:          types.SideTypeSell,
 					Type:          types.OrderTypeLimit,
@@ -165,7 +165,7 @@ func (c *CellOrder) GenerateCounterOrder() []ICellOrder {
 		}
 		orders = append(orders, &CellOrder{
 			Order: types.SubmitOrder{
-				ClientOrderID: fmt.Sprintf("%s-%s", cell.Symbol, uuid.New().String()),
+				ClientOrderID: fmt.Sprintf("%s", uuid.New().String()),
 				Symbol:        cell.Symbol,
 				Side:          types.SideTypeBuy,
 				Type:          types.OrderTypeLimit,
@@ -185,7 +185,7 @@ func (c *CellOrder) GenerateCounterOrder() []ICellOrder {
 		if quantity > 0 && !merge {
 			orders = append(orders, &CellOrder{
 				Order: types.SubmitOrder{
-					ClientOrderID: fmt.Sprintf("%s-%s", cell.Symbol, uuid.New().String()),
+					ClientOrderID: fmt.Sprintf("%s", uuid.New().String()),
 					Symbol:        cell.Symbol,
 					Side:          types.SideTypeBuy,
 					Type:          types.OrderTypeLimit,

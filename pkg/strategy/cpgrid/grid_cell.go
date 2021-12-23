@@ -68,7 +68,7 @@ func (c *GridCell) _generateInitOrders(currentPrice fixedpoint.Value) []ICellOrd
 		//sell
 		orders = append(orders, &CellOrder{
 			Order: types.SubmitOrder{
-				ClientOrderID: fmt.Sprintf("%s-%s", c.Symbol, uuid.New().String()),
+				ClientOrderID: fmt.Sprintf("%s", uuid.New().String()),
 				Symbol:        c.Symbol,
 				Side:          types.SideTypeSell,
 				Type:          types.OrderTypeLimit,
@@ -95,7 +95,7 @@ func (c *GridCell) _generateInitOrders(currentPrice fixedpoint.Value) []ICellOrd
 	} else {
 		orders = append(orders, &CellOrder{
 			Order: types.SubmitOrder{
-				ClientOrderID: fmt.Sprintf("%s-%s", c.Symbol, uuid.New().String()),
+				ClientOrderID: fmt.Sprintf("%s", uuid.New().String()),
 				Symbol:        c.Symbol,
 				Side:          types.SideTypeBuy,
 				Type:          types.OrderTypeLimit,
