@@ -514,46 +514,70 @@ func (e *Exchange) QueryClosedOrders(ctx context.Context, symbol string, since, 
 }
 
 func (e *Exchange) CancelOrders(ctx context.Context, orders ...types.Order) (err error) {
-	if e.IsFutures {
-		for _, o := range orders {
-			var req = e.futuresClient.NewCancelOrderService()
-
-			// Mandatory
-			req.Symbol(o.Symbol)
-
-			if o.OrderID > 0 {
-				req.OrderID(int64(o.OrderID))
-			}
-
-			_, _err := req.Do(ctx)
-			if _err != nil {
-				log.WithError(_err).Errorf("order cancel error")
-				err = multierr.Append(err, _err)
-			}
-		}
-
-		return err
-	}
-
 	for _, o := range orders {
-		var req = e.Client.NewCancelOrderService()
-
-		// Mandatory
-		req.Symbol(o.Symbol)
-
-		if o.OrderID > 0 {
-			req.OrderID(int64(o.OrderID))
-		} else if len(o.ClientOrderID) > 0 {
-			req.NewClientOrderID(o.ClientOrderID)
-		}
-
-		_, _err := req.Do(ctx)
-		if _err != nil {
-			log.WithError(_err).Errorf("order cancel error")
-			err = multierr.Append(err, _err)
+		if e.IsFutures {
+			err = e.cancelFutureOrder(ctx, o, err)
+		} else if e.IsMargin {
+			err = e.cancelMarginOrder(ctx, o, err)
+		} else {
+			err = e.CancelSpotOrder(ctx, o, err)
 		}
 	}
+	return err
+}
 
+func (e *Exchange) cancelFutureOrder(ctx context.Context, o types.Order, err error) error {
+	var req = e.futuresClient.NewCancelOrderService()
+
+	// Mandatory
+	req.Symbol(o.Symbol)
+
+	if o.OrderID > 0 {
+		req.OrderID(int64(o.OrderID))
+	}
+
+	_, _err := req.Do(ctx)
+	if _err != nil {
+		log.WithError(_err).Errorf("order cancel error")
+		err = multierr.Append(err, _err)
+	}
+	return err
+}
+
+func (e *Exchange) CancelSpotOrder(ctx context.Context, o types.Order, err error) error {
+	var req = e.Client.NewCancelOrderService()
+
+	// Mandatory
+	req.Symbol(o.Symbol)
+
+	if o.OrderID > 0 {
+		req.OrderID(int64(o.OrderID))
+	} else if len(o.ClientOrderID) > 0 {
+		req.NewClientOrderID(o.ClientOrderID)
+	}
+
+	_, _err := req.Do(ctx)
+	if _err != nil {
+		log.WithError(_err).Errorf("order cancel error")
+		err = multierr.Append(err, _err)
+	}
+	return err
+}
+
+func (e *Exchange) cancelMarginOrder(ctx context.Context, o types.Order, err error) error {
+	var req = e.Client.NewCancelMarginOrderService()
+	// Mandatory
+	req.Symbol(o.Symbol)
+	if o.OrderID > 0 {
+		req.OrderID(int64(o.OrderID))
+	} else if len(o.ClientOrderID) > 0 {
+		req.NewClientOrderID(o.ClientOrderID)
+	}
+	_, _err := req.Do(ctx)
+	if _err != nil {
+		log.WithError(_err).Errorf("order cancel error")
+		err = multierr.Append(err, _err)
+	}
 	return err
 }
 
